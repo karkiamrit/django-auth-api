@@ -8,7 +8,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions
 
 
+
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 # Generate Token Manually
 
@@ -48,7 +51,6 @@ class UserLoginView(APIView):
         
         if user is not None:
             token=get_tokens_for_user(user)
-            
             response = JsonResponse({'message': 'Login Success'})
             response.set_cookie('access_token', token['access'], httponly=True)
             response.set_cookie('refresh_token', token['refresh'], httponly=True)
@@ -106,11 +108,12 @@ class UserLogoutView(APIView):
         refresh_token = request.COOKIES.get('refresh_token')
 
         if refresh_token is not None:
-            try:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
-            except Exception as e:
-                return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+            # Delete the refresh token from the database or cache
+            # Alternatively, you can mark the token as expired in the database or cache
+            # Here, we assume you have a User model with a refresh_token field
+            user = request.user
+            user.refresh_token = None
+            user.save()
 
             # Clear the access and refresh token cookies
             response = Response({'message': 'Logout Successful'})
@@ -119,3 +122,9 @@ class UserLogoutView(APIView):
             return response
         else:
             return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Apply the CSRF exemption to the logout view
+@method_decorator(csrf_exempt, name='dispatch')
+class UserLogoutViewCSRFExempt(UserLogoutView):
+    pass
